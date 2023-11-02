@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/celestiaorg/celestia-app/app"
 	"github.com/celestiaorg/celestia-app/app/encoding"
@@ -10,15 +12,38 @@ import (
 	"github.com/celestiaorg/celestia-app/pkg/namespace"
 	"github.com/celestiaorg/celestia-app/pkg/user"
 	blobtypes "github.com/celestiaorg/celestia-app/x/blob/types"
+	"github.com/cosmos/cosmos-sdk/codec"
+	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
+	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	"google.golang.org/grpc"
+
 	"google.golang.org/grpc/credentials/insecure"
 )
+
+func getCodec() codec.Codec {
+	registry := codectypes.NewInterfaceRegistry()
+	cryptocodec.RegisterInterfaces(registry)
+	return codec.NewProtoCodec(registry)
+}
 
 func main() {
 	gasLimit := blobtypes.DefaultEstimateGas([]uint32{1})
 	fmt.Println(gasLimit)
+
+	keyringDir := os.ExpandEnv("/Users/xiaohuo/.celestia-light-mocha-4/keys/")
+	// Create or load the keyring
+	kr, err := keyring.New("xiaohuo", "file", keyringDir, strings.NewReader(""), getCodec())
+	if err != nil {
+		fmt.Println("Error creating or loading keyring:", err)
+		return
+	}
+	err = DemoSubmitData("grpc-celestia-mocha.architectnodes.com:1443", kr)
+	if err != nil {
+		fmt.Println("submit data error: ", err.Error())
+	}
+
 }
 
 // SubmitData is a demo function that shows how to use the signer to submit data
@@ -38,7 +63,7 @@ func DemoSubmitData(grpcAddr string, kr keyring.Keyring) error {
 	defer conn.Close()
 
 	// get the address of the account we want to use to sign transactions.
-	rec, err := kr.Key("accountName")
+	rec, err := kr.Key("xiaohuo")
 	if err != nil {
 		return err
 	}
@@ -56,8 +81,9 @@ func DemoSubmitData(grpcAddr string, kr keyring.Keyring) error {
 	}
 
 	ns := namespace.MustNewV0([]byte("1234567890"))
+	fmt.Println("ns: ", ns)
 
-	fmt.Println("namepace", len(ns.Bytes()))
+	fmt.Println("namepace: ", len(ns.Bytes()))
 
 	blob, err := blobtypes.NewBlob(ns, []byte("some data"), appconsts.ShareVersionZero)
 	if err != nil {
